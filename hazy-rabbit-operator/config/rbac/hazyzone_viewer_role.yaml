@@ -1,0 +1,27 @@
+# permissions for end users to view hazyzones.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: hazyzone-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: hazy-rabbit-operator
+    app.kubernetes.io/part-of: hazy-rabbit-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: hazyzone-viewer-role
+rules:
+- apiGroups:
+  - hazy.hazy.com
+  resources:
+  - hazyzones
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - hazy.hazy.com
+  resources:
+  - hazyzones/status
+  verbs:
+  - get

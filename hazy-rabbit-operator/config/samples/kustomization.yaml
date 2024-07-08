@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- hazy_v1alpha1_hazyzone.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

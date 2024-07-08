@@ -1,0 +1,12 @@
+apiVersion: hazy.hazy.com/v1alpha1
+kind: HazyZone
+metadata:
+  labels:
+    app.kubernetes.io/name: hazyzone
+    app.kubernetes.io/instance: hazyzone-sample
+    app.kubernetes.io/part-of: hazy-rabbit-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: hazy-rabbit-operator
+  name: hazyzone-sample
+spec:
+  # TODO(user): Add fields here
