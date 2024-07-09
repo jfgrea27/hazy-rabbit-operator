@@ -2,6 +2,9 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: rabbitmq
+  labels:
+    app.kubernetes.io/name: rabbitmq
+  namespace: broker-zone
 spec:
   containers:
   - name: rabbitmq-pod
@@ -14,3 +17,24 @@ spec:
       value: admin
     - name: RABBITMQ_DEFAULT_PASS
       value: password
+
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbit-svc
+  namespace: broker-zone
+spec:
+  selector:
+    app.kubernetes.io/name: rabbitmq
+  ports:
+    - protocol: TCP
+      port: 15672
+      targetPort: 15672
+      name: console
+    - protocol: TCP
+      port: 5672
+      targetPort: 5672
+      name: server

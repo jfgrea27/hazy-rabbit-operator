@@ -18,12 +18,17 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	hazyv1alpha1 "github.com/jfgrea27/hazy-rabbit-operator/api/v1alpha1"
 	rabbitclient "github.com/jfgrea27/hazy-rabbit-operator/internal/rabbitclient"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -76,18 +81,21 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	// get rabbit client and check we can connect
 	rclient := rabbitclient.BuildRabbitClient(log)
 
 	if rclient == nil {
 		return ctrl.Result{}, &RabbitServerNotUp{}
 
 	}
+
 	ns := hazyzone.GetNamespace()
 
 	exchange := rabbitclient.RabbitExchange{
 		ExchangeName: ns,
 		Queues:       hazyzone.Spec.Queues,
 		VHost:        ns,
+		Password:     uuid.New().String(),
 	}
 
 	isHazyZoneMarkedToBeDeleted := hazyzone.GetDeletionTimestamp() != nil
@@ -112,13 +120,56 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
+	// create K8S secret with credentials for users of vHost.
+	secretFound := &corev1.Secret{}
+	err = r.Get(ctx, types.NamespacedName{Name: buildSecretName(ns), Namespace: hazyzone.Namespace}, secretFound)
+	if err != nil && errors.IsNotFound(err) {
+		// Define a new Secret
+		sec := r.secretForHazyZone(hazyzone, &exchange, ns)
+		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
+		err = r.Create(ctx, sec)
+		if err != nil {
+			log.Error(err, "Failed to create new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
+			return ctrl.Result{}, err
+		}
+	} else if err != nil {
+		log.Error(err, "Failed to get Secret")
+		return ctrl.Result{}, err
+	}
+	// Add rabbit resources
 	rclient.SetupRabbit(&exchange)
 
 	return ctrl.Result{}, nil
 
 	// TODO
 	// refactor more
-	// secret managmenet extra resource.
+	// tests
+	// revisit models
+}
+
+func buildSecretName(ns string) string {
+	return fmt.Sprintf("%v-rabbit-sec", ns)
+}
+
+// secretForHazyZone returns a hazyZone Secret object
+func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone, exchange *rabbitclient.RabbitExchange, ns string) *corev1.Secret {
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      buildSecretName(ns),
+			Namespace: ns,
+		},
+		StringData: map[string]string{
+			"RABBIT_USER":     exchange.VHost,
+			"RABBIT_PASSWORD": exchange.Password,
+		},
+	}
+	// Set Secrtet instance as the owner and controller
+	ctrl.SetControllerReference(hz, sec, r.Scheme)
+	return sec
+}
+
+func labelsForMemcached(name string) map[string]string {
+	return map[string]string{"app": "memcached", "memcached_cr": name}
 }
 
 func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, exchange *rabbitclient.RabbitExchange, rclient *rabbitclient.RabbitClient) error {
@@ -132,5 +183,6 @@ func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, exchange *ra
 func (r *HazyZoneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&hazyv1alpha1.HazyZone{}).
+		Owns(&corev1.Secret{}).
 		Complete(r)
 }

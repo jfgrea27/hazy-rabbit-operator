@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -13,7 +15,16 @@ func failOnError(err error, msg string) {
 }
 
 func main() {
-	conn, err := amqp.Dial("amqp://zonea:zonea@localhost:5672/zonea")
+	conn, err := amqp.Dial(
+		fmt.Sprintf(
+			"amqp://%v:%v@%v:%v/%v",
+			os.Getenv("RABBIT_USER"),
+			os.Getenv("RABBIT_PASSWORD"),
+			os.Getenv("SAMPLE_RABBIT_HOST"),
+			os.Getenv("SAMPLE_RABBIT_PORT"),
+			os.Getenv("SAMPLE_EXCHANGE"),
+		),
+	)
 	failOnError(err, "Failed to connect to RabbitMQ")
 	defer conn.Close()
 
@@ -22,13 +33,13 @@ func main() {
 	defer ch.Close()
 
 	msgs, err := ch.Consume(
-		"queue5", // queue
-		"",       // consumer
-		true,     // auto-ack
-		false,    // exclusive
-		false,    // no-local
-		false,    // no-wait
-		nil,      // args
+		os.Getenv("SAMPLE_QUEUE"), // queue
+		"",                        // consumer
+		true,                      // auto-ack
+		false,                     // exclusive
+		false,                     // no-local
+		false,                     // no-wait
+		nil,                       // args
 	)
 	failOnError(err, "Failed to register a consumer")
 

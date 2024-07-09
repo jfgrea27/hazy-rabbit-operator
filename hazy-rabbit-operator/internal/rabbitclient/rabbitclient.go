@@ -1,4 +1,3 @@
-
 package rabbitclient
 
 import (
@@ -18,6 +17,7 @@ type RabbitExchange struct {
 	ExchangeName string   `json:"exchangeName"`
 	Queues       []string `json:"queues"`
 	VHost        string   `json:"vhost"`
+	Password     string   `json:"password"`
 }
 
 type RabbitUser struct {
@@ -73,7 +73,7 @@ func buildAdminUser() RabbitUser {
 func buildClientUser(re *RabbitExchange) RabbitUser {
 	return RabbitUser{
 		Username: re.VHost,
-		Password: re.VHost,
+		Password: re.Password,
 	}
 }
 func (client *RabbitClient) deleteQueue(queue string, vhost string) {
@@ -285,8 +285,7 @@ func (client *RabbitClient) SetupRabbit(re *RabbitExchange) RabbitUser {
 
 }
 
-
-func getListQueuesToDelete(curr map[string]string, wanted map[string]string) []string{
+func getListQueuesToDelete(curr map[string]string, wanted map[string]string) []string {
 	res := make([]string, 0)
 
 	for k, _ := range curr {
