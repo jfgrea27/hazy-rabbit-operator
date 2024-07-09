@@ -8,18 +8,6 @@ rules:
 - apiGroups:
   - hazy.hazy.com
   resources:
-  - hazyzones
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - hazy.hazy.com
-  resources:
   - hazyzones/finalizers
   verbs:
   - update
@@ -31,3 +19,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - hazy.hazy.com
+  resources:
+  - hazyzonles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

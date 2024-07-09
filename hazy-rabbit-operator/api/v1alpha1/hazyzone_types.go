@@ -25,8 +25,7 @@ import (
 
 // HazyZoneSpec defines the desired state of HazyZone
 type HazyZoneSpec struct {
-	ExchangeName string   `json:"exchangeName,omitempty"`
-	QueueNames   []string `json:"queueNames"`
+	Queues []string `json:"queues"`
 }
 
 // HazyZoneStatus defines the observed state of HazyZone

@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -36,6 +37,19 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+type ErrMissingEnvVar struct{}
+
+func (m *ErrMissingEnvVar) Error() string {
+	return "Missing Env Var"
+}
+
+var ENVS = []string{
+	"RABBIT_ADMIN_PASSWORD",
+	"RABBIT_ADMIN_USERNAME",
+	"RABBIT_HOST",
+	"RABBIT_CONSOLE_PORT",
+	"RABBIT_PORT",
+}
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -48,7 +62,18 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+func checkEnv() {
+	for _, env := range ENVS {
+		_, present := os.LookupEnv("RABBIT_ADMIN_USERNAME")
+		if !present {
+			panic(fmt.Sprintf("%v is not set", env))
+		}
+	}
+}
+
 func main() {
+	checkEnv()
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string

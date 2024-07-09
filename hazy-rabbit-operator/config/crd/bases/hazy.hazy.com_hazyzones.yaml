@@ -35,14 +35,12 @@ spec:
           spec:
             description: HazyZoneSpec defines the desired state of HazyZone
             properties:
-              exchangeName:
-                type: string
-              queueNames:
+              queues:
                 items:
                   type: string
                 type: array
             required:
-            - queueNames
+            - queues
             type: object
           status:
             description: HazyZoneStatus defines the observed state of HazyZone
