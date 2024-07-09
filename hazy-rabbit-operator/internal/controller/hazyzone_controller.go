@@ -101,7 +101,7 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	isHazyZoneMarkedToBeDeleted := hazyzone.GetDeletionTimestamp() != nil
 	if isHazyZoneMarkedToBeDeleted {
 		if controllerutil.ContainsFinalizer(hazyzone, hazyRabbitFinalizer) {
-			// Run finalization logic for memcachedFinalizer. If the
+			// Run finalization logic for hazyZoneFinalizer. If the
 			// finalization logic fails, don't remove the finalizer so
 			// that we can retry during the next reconciliation.
 
@@ -109,7 +109,7 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				return ctrl.Result{}, err
 			}
 
-			// Remove memcachedFinalizer. Once all finalizers have been
+			// Remove hazyZoneFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
 			controllerutil.RemoveFinalizer(hazyzone, hazyRabbitFinalizer)
 			err := r.Update(ctx, hazyzone)
@@ -168,9 +168,6 @@ func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone, exchan
 	return sec
 }
 
-func labelsForMemcached(name string) map[string]string {
-	return map[string]string{"app": "memcached", "memcached_cr": name}
-}
 
 func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, exchange *rabbitclient.RabbitExchange, rclient *rabbitclient.RabbitClient) error {
 	log.Info("Successfully finalized rabbit cleanup.")
