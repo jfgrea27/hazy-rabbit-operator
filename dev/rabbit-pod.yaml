@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rabbitmq
+spec:
+  containers:
+  - name: rabbitmq-pod
+    image: rabbitmq:3-management
+    ports:
+    - containerPort: 5672
+    - containerPort: 15672
+    env:
+    - name: RABBITMQ_DEFAULT_USER
+      value: admin
+    - name: RABBITMQ_DEFAULT_PASS
+      value: password
