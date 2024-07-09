@@ -1,0 +1,48 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: hazy-rabbit-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: HazyZone is the Schema for the hazyzones API
+      displayName: Hazy Zone
+      kind: HazyZone
+      name: hazyzones.hazy.hazy.com
+      version: v1alpha1
+  description: An Operator to manage Hazy Zones
+  displayName: hazy-rabbit-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - security
+  - rabbitmq
+  links:
+  - name: Hazy Rabbit Operator
+    url: https://hazy-rabbit-operator.domain
+  maintainers:
+  - email: jamesrea
+    name: name1
+  maturity: alpha
+  provider:
+    name: James Rea
+  version: 0.0.0
