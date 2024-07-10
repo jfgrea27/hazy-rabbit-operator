@@ -22,7 +22,7 @@ func main() {
 			os.Getenv("RABBIT_PASSWORD"),
 			os.Getenv("SAMPLE_RABBIT_HOST"),
 			os.Getenv("SAMPLE_RABBIT_PORT"),
-			os.Getenv("SAMPLE_EXCHANGE"),
+			os.Getenv("SAMPLE_VHOST"),
 		),
 	)
 	failOnError(err, "Failed to connect to RabbitMQ")

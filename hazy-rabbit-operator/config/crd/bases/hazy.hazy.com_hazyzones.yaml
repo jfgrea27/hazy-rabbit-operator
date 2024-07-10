@@ -35,10 +35,18 @@ spec:
           spec:
             description: HazyZoneSpec defines the desired state of HazyZone
             properties:
+              exchange:
+                type: string
+              password:
+                type: string
               queues:
                 items:
                   type: string
                 type: array
+              username:
+                type: string
+              vHost:
+                type: string
             required:
             - queues
             type: object

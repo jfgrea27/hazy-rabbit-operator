@@ -11,5 +11,11 @@ metadata:
   finalizers:
   - hazy.hazy.com/rabbitcleanup
 spec:
+  vHost: zone-train
+  username: hazy-usr
+  exchange: hazy
   queues:
-  - queue5
+  - queue-train
+  - queue-logs
+  - queue-other
+  - new-queue

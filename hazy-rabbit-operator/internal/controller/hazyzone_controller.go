@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	hazyv1alpha1 "github.com/jfgrea27/hazy-rabbit-operator/api/v1alpha1"
 	rabbitclient "github.com/jfgrea27/hazy-rabbit-operator/internal/rabbitclient"
 	corev1 "k8s.io/api/core/v1"
@@ -65,8 +64,8 @@ const hazyRabbitFinalizer = "hazy.hazy.com/rabbitcleanup"
 func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	hazyzone := &hazyv1alpha1.HazyZone{}
-	err := r.Get(ctx, req.NamespacedName, hazyzone)
+	hz := &hazyv1alpha1.HazyZone{}
+	err := r.Get(ctx, req.NamespacedName, hz)
 
 	// Get the HazyZone
 	if err != nil {
@@ -81,33 +80,27 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	// fill zone with defaults if not provided
+	hz = hazyv1alpha1.FillDefaultsHazyZoneSPec(hz, hz.Namespace)
+
 	// get rabbit client and check we can connect
 	rclient := rabbitclient.BuildRabbitClient(log)
 
 	if rclient == nil {
 		err := &RabbitServerNotUp{}
-		log.Error(err, "Exponential backoff to try connect to RabbitMQ.")
+		log.Error(err, "Exponential backoff to try connect to RabbitMQ on .")
 		return ctrl.Result{}, err
 
 	}
 
-	ns := hazyzone.GetNamespace()
-
-	exchange := rabbitclient.RabbitExchange{
-		ExchangeName: ns,
-		Queues:       hazyzone.Spec.Queues,
-		VHost:        ns,
-		Password:     uuid.New().String(),
-	}
-
-	isHazyZoneMarkedToBeDeleted := hazyzone.GetDeletionTimestamp() != nil
+	isHazyZoneMarkedToBeDeleted := hz.GetDeletionTimestamp() != nil
 	if isHazyZoneMarkedToBeDeleted {
-		if controllerutil.ContainsFinalizer(hazyzone, hazyRabbitFinalizer) {
+		if controllerutil.ContainsFinalizer(hz, hazyRabbitFinalizer) {
 			// Run finalization logic for hazyZoneFinalizer. If the
 			// finalization logic fails, don't remove the finalizer so
 			// that we can retry during the next reconciliation.
 
-			if err := r.finalizeRabbitCleanup(log, &exchange, rclient); err != nil {
+			if err := r.finalizeRabbitCleanup(log, &hz.Spec, rclient); err != nil {
 				return ctrl.Result{}, err
 			} else {
 				log.Info("Successfully finalized rabbit cleanup.")
@@ -115,8 +108,8 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 			// Remove hazyZoneFinalizer. Once all finalizers have been
 			// removed, the object will be deleted.
-			controllerutil.RemoveFinalizer(hazyzone, hazyRabbitFinalizer)
-			err := r.Update(ctx, hazyzone)
+			controllerutil.RemoveFinalizer(hz, hazyRabbitFinalizer)
+			err := r.Update(ctx, hz)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -126,10 +119,11 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// create K8S secret with credentials for users of vHost.
 	secretFound := &corev1.Secret{}
-	err = r.Get(ctx, types.NamespacedName{Name: buildSecretName(ns), Namespace: hazyzone.Namespace}, secretFound)
+
+	err = r.Get(ctx, types.NamespacedName{Name: buildSecretName(hz.Namespace), Namespace: hz.Namespace}, secretFound)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Secret
-		sec := r.secretForHazyZone(hazyzone, &exchange, ns)
+		sec := r.secretForHazyZone(hz)
 		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
 		err = r.Create(ctx, sec)
 		if err != nil {
@@ -140,11 +134,12 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Error(err, "Failed to get Secret")
 		return ctrl.Result{}, err
 	}
+
 	// Add rabbit resources
-	_, err = rclient.SetupRabbit(&exchange)
+	err = rclient.SetupRabbit(&hz.Spec)
 
 	if err != nil {
-		log.Error(err, "Failed to setup rabbit zone", "namespace", hazyzone.Namespace)
+		log.Error(err, "Failed to setup rabbit zone", "namespace", hz.Namespace)
 		return ctrl.Result{}, err
 	}
 
@@ -160,15 +155,16 @@ func buildSecretName(ns string) string {
 }
 
 // secretForHazyZone returns a hazyZone Secret object
-func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone, exchange *rabbitclient.RabbitExchange, ns string) *corev1.Secret {
+func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone) *corev1.Secret {
+
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      buildSecretName(ns),
-			Namespace: ns,
+			Name:      buildSecretName(hz.Namespace),
+			Namespace: hz.Namespace,
 		},
 		StringData: map[string]string{
-			"RABBIT_USER":     exchange.VHost,
-			"RABBIT_PASSWORD": exchange.Password,
+			"RABBIT_USER":     hz.Spec.VHost,
+			"RABBIT_PASSWORD": hz.Spec.Password,
 		},
 	}
 	// Set Secrtet instance as the owner and controller
@@ -176,9 +172,9 @@ func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone, exchan
 	return sec
 }
 
-func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, exchange *rabbitclient.RabbitExchange, rclient *rabbitclient.RabbitClient) error {
+func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, spec *hazyv1alpha1.HazyZoneSpec, rclient *rabbitclient.RabbitClient) error {
 	log.Info("Tearing down Rabbit Zone")
-	err := rclient.TearDownRabbit(exchange)
+	err := rclient.TearDownRabbit(spec)
 	return err
 }
 

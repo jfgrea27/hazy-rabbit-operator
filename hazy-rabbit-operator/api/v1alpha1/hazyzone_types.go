@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/google/uuid"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,7 +26,11 @@ import (
 
 // HazyZoneSpec defines the desired state of HazyZone
 type HazyZoneSpec struct {
-	Queues []string `json:"queues"`
+	VHost    string   `json:"vHost,omitempty"`
+	Exchange string   `json:"exchange,omitempty"`
+	Username string   `json:"username,omitempty"`
+	Password string   `json:"password,omitempty"`
+	Queues   []string `json:"queues"`
 }
 
 // HazyZoneStatus defines the observed state of HazyZone
@@ -57,4 +62,25 @@ type HazyZoneList struct {
 
 func init() {
 	SchemeBuilder.Register(&HazyZone{}, &HazyZoneList{})
+}
+
+func FillDefaultsHazyZoneSPec(hz *HazyZone, ns string) *HazyZone {
+	spec := hz.Spec
+	if len(spec.VHost) == 0 {
+		spec.VHost = ns
+	}
+	if len(spec.Username) == 0 {
+		spec.Username = ns
+	}
+
+	if len(spec.Username) == 0 {
+		spec.Username = ns
+	}
+	if len(spec.Password) == 0 {
+		spec.Password = uuid.New().String()
+	}
+
+	hz.Spec = spec
+
+	return hz
 }
