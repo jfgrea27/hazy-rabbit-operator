@@ -24,6 +24,8 @@
                 p.kubernetes-helm
                 p.kustomize_4
                 p.operator-sdk
+                p.zulu8
+
               ];
               shellHook=''
                 export GOROOT=${p.go.outPath}/share/go

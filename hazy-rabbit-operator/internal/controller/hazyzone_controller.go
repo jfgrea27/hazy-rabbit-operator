@@ -77,7 +77,7 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			log.Info("HazyZone not found. Ignoring since object must be deleted")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to get HazyZone")
+		log.Error(err, "Failed to fetch HazyZone")
 		return ctrl.Result{}, err
 	}
 
@@ -85,7 +85,9 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	rclient := rabbitclient.BuildRabbitClient(log)
 
 	if rclient == nil {
-		return ctrl.Result{}, &RabbitServerNotUp{}
+		err := &RabbitServerNotUp{}
+		log.Error(err, "Exponential backoff to try connect to RabbitMQ.")
+		return ctrl.Result{}, err
 
 	}
 
@@ -107,6 +109,8 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 			if err := r.finalizeRabbitCleanup(log, &exchange, rclient); err != nil {
 				return ctrl.Result{}, err
+			} else {
+				log.Info("Successfully finalized rabbit cleanup.")
 			}
 
 			// Remove hazyZoneFinalizer. Once all finalizers have been
@@ -126,7 +130,7 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new Secret
 		sec := r.secretForHazyZone(hazyzone, &exchange, ns)
-		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Deployment.Name", sec.Name)
+		log.Info("Creating a new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
 		err = r.Create(ctx, sec)
 		if err != nil {
 			log.Error(err, "Failed to create new Secret", "Secret.Namespace", sec.Namespace, "Secret.Name", sec.Name)
@@ -137,12 +141,16 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 	// Add rabbit resources
-	rclient.SetupRabbit(&exchange)
+	_, err = rclient.SetupRabbit(&exchange)
+
+	if err != nil {
+		log.Error(err, "Failed to setup rabbit zone", "namespace", hazyzone.Namespace)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 
 	// TODO
-	// refactor more
 	// tests
 	// revisit models
 }
@@ -168,12 +176,10 @@ func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone, exchan
 	return sec
 }
 
-
 func (r *HazyZoneReconciler) finalizeRabbitCleanup(log logr.Logger, exchange *rabbitclient.RabbitExchange, rclient *rabbitclient.RabbitClient) error {
-	log.Info("Successfully finalized rabbit cleanup.")
-	rclient.TearDownRabbit(exchange)
-
-	return nil
+	log.Info("Tearing down Rabbit Zone")
+	err := rclient.TearDownRabbit(exchange)
+	return err
 }
 
 // SetupWithManager sets up the controller with the Manager.
