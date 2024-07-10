@@ -1,0 +1,135 @@
+* Cofide Presentation
+
+** Context
+
+Hazy is a syntheitc data pipeline.
+Following best practices, including [[https://listings.pcisecuritystandards.org/documents/Guidance-PCI-DSS-Scoping-and-Segmentation_v1.pdf][PCI Guidance on Network Segmentation]], the application is separated into several *zones*:
+
+- Hub Zone - where the configuration of synthetic data pipelines is managed.
+- Sensitive Zone - where the compute of our AI models are run. These *require access to sensitive data*.
+
+A tightly monitored and fully vettable [[https://www.rabbitmq.com/][RabbitMQ Broker]] is used to trigger training/generation jobs, get updates on each job, etc.
+
+
+*** Quick RabbitMQ context
+RabbitMQ is a message broker.
+
+Each broker can have multiple (logically separated) vHosts and permissions for users on each hosts can be managed down to the specific queue.
+
+A given vHost has an exchange in which messages are delievered. The broker then forwards these to the queues that are bound to the given exchange.
+
+*** The problem
+Before this operator, the Hub required *admin* access to manage the creation of vHosts and users, queue topology and permission attachment to users.
+
+As the Hub is just a consumer/publisher of messages, it shouldn't have this access, as this makes the system more vulnerable. (*Principle of Least Priviledge*)
+
+
+** Solution
+
+K8S operator pattern.
+The `hazy.hazy.com/v1alpha1/HazyZone` Custom Resource Definition (CRD) specifies the zone's user and topology.
+
+The `controller` has *admin* access to the RabbitMQ broker.
+
+The `controller` receives updates in `hazy.hazy.com/v1alpha1/HazyZone` state and manages the state in RabbitMQ.
+
+The `controller` will:
+- Create/Update/Delete any RabbitMQ vHosts, queues, exchanges, users and permissions.
+- Create/Update/Delete a `corev1.Secret` with the username and password that is generated during runtime.
+
+Consumer/Publisher pods just need to specify the vHost and secret for usr/pwd, and they can connect to the RabbitMQ broker.
+
+In this way, the *hub* or any other service, just needs to have the secret name configured in its spec to inherit from *user created credentials* that can *only publish/consume from the exchange* created.
+
+#+begin_src plantuml :results verbatim
+  @startuml
+
+  Hub ->X RabbitMQ : Hub does not have RabbitMQ credentials to publis/consume
+
+  RabbitOperatorControler <- K8S : Operator listens for HazyZone CRs events
+
+  K8SUserAdmin -> K8S : Create HazyZone CR
+
+  RabbitOperatorControler <- K8S: Operator reacts to changes in CR
+
+  RabbitOperatorControler -> K8S: Create Secret with User/Password
+  RabbitOperatorControler -> RabbitMQ: Create User, VHost, User/Password, Exchange, Queues
+
+
+  Hub -> RabbitMQ : Hub can not Communicate with RabbitMQ with given User/Password
+
+  @enduml
+          
+#+end_src
+
+#+RESULTS:
+[[file:images/operator-uml.png]]
+
+** Demo
+
+
+*Show:*
+[[~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/config/crd/bases/hazy.hazy.com_hazyzones.yaml][CRD Definition]]
+[[~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml][CR Example]]
+
+
+
+#+begin_src shell
+
+  # Add the CRD
+  k apply -f hazy-rabbit-operator/config/crd/bases/hazy.hazy.com_hazyzones.yaml
+  
+  # Create Rabbit Broker namespace
+  k create ns broker-zone
+
+  # Create Rabbit Broker.
+  k apply -f dev/rabbit-pod.yaml -n broker-zone
+
+  # Port forward console + server
+  kpf rabbitmq 15672 -n broker-zone
+  kpf rabbitmq 5672 -n broker-zone
+
+  # Create Zone A namespace
+  k create ns zonea
+
+  # Create CR 
+  k apply -f hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml -n zonea
+
+  # Create consuming pod
+  k apply -f dev/consumer-pod.yaml -n zonea
+
+#+end_src
+
+
+** Design
+
+*** K8S Owned References and Finalizers
+
+The HazyZone CR owns a secret and is in charge of the RabbitMQ.
+
+
+A Finalizer is added to the CR as shown [[file:~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml::11][Finalizers Example]]
+The CR won't be deleted until RabbitMQ tears down the vHost etc.
+
+The corresponding secret has an Owned Reference (K8S jargon) to the CR. Hence when deleting the CR, it will delete the secret. This is registed during the setup of Controller [[file:~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/internal/controller/hazyzone_controller.go::185][Secret Owned Reference]]
+
+
+*** *Idempotency* in Rabbit commands
+
+Running the SetupRabbitZone twice should not cause any issues.
+If there is already a User added, the password is not changed.
+
+Since idempotency, we can requeue the `reconcile.Result`, which will be requeud using exponential backoff.
+
+*** Separation of concerns
+
+- `hhttp` does all Http handling
+- `rabitclient` orchestrates any RabbitMQ calls.
+
+** Discussion / Next steps
+
+- Bundle the operator - already lots of tooling for this.
+- Permissions - maybe make more granular.
+
+
+

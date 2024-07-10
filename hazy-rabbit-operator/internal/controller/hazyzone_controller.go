@@ -117,7 +117,7 @@ func (r *HazyZoneReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	// create K8S secret with credentials for users of vHost.
+	// upsert K8S secret with credentials for users of vHost.
 	secretFound := &corev1.Secret{}
 
 	err = r.Get(ctx, types.NamespacedName{Name: buildSecretName(hz.Namespace), Namespace: hz.Namespace}, secretFound)
