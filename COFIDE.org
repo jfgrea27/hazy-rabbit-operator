@@ -1,5 +1,4 @@
 * Cofide Presentation
-
 ** Context
 
 Hazy is a syntheitc data pipeline.
@@ -9,7 +8,6 @@ Following best practices, including [[https://listings.pcisecuritystandards.org/
 - Sensitive Zone - where the compute of our AI models are run. These *require access to sensitive data*.
 
 A tightly monitored and fully vettable [[https://www.rabbitmq.com/][RabbitMQ Broker]] is used to trigger training/generation jobs, get updates on each job, etc.
-
 
 *** Quick RabbitMQ context
 RabbitMQ is a message broker.
@@ -22,7 +20,6 @@ A given vHost has an exchange in which messages are delievered. The broker then 
 Before this operator, the Hub required *admin* access to manage the creation of vHosts and users, queue topology and permission attachment to users.
 
 As the Hub is just a consumer/publisher of messages, it shouldn't have this access, as this makes the system more vulnerable. (*Principle of Least Priviledge*)
-
 
 ** Solution
 
@@ -66,8 +63,6 @@ In this way, the *hub* or any other service, just needs to have the secret name 
 [[file:images/operator-uml.png]]
 
 ** Demo
-
-
 *Show:*
 [[~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/config/crd/bases/hazy.hazy.com_hazyzones.yaml][CRD Definition]]
 [[~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml][CR Example]]
@@ -76,31 +71,33 @@ In this way, the *hub* or any other service, just needs to have the secret name 
 
 #+begin_src shell
 
+  # Start controller
+  (cd hazy-rabbit-operator && make test run)
+
   # Add the CRD
   k apply -f hazy-rabbit-operator/config/crd/bases/hazy.hazy.com_hazyzones.yaml
-  
+
   # Create Rabbit Broker namespace
   k create ns broker-zone
 
-  # Create Rabbit Broker.
+  # Create Rabbit Broker - LoadBalancer - exposed service on all required ports (for demo)
   k apply -f dev/rabbit-pod.yaml -n broker-zone
 
-  # Port forward console + server
-  kpf rabbitmq 15672 -n broker-zone
-  kpf rabbitmq 5672 -n broker-zone
-
-  # Create Zone A namespace
-  k create ns zonea
+  # Create Zone Sensitive namespace
+  k create ns zone-sensitive
 
   # Create CR 
-  k apply -f hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml -n zonea
-
-  # Create consuming pod
-  k apply -f dev/consumer-pod.yaml -n zonea
+  k apply -f hazy-rabbit-operator/config/samples/hazy_v1alpha1_hazyzone.yaml -n zone-sensitive
 
 #+end_src
 
+[[~/psrc/hazy-rabbit-operator/dev/consumer/consumer.go][Consumer Script]]
 
+#+begin_src shell
+  # run consumer script
+  go run dev/consumer/consumer.go
+
+#+end_src
 ** Design
 
 *** K8S Owned References and Finalizers
@@ -112,7 +109,6 @@ A Finalizer is added to the CR as shown [[file:~/psrc/hazy-rabbit-operator/hazy-
 The CR won't be deleted until RabbitMQ tears down the vHost etc.
 
 The corresponding secret has an Owned Reference (K8S jargon) to the CR. Hence when deleting the CR, it will delete the secret. This is registed during the setup of Controller [[file:~/psrc/hazy-rabbit-operator/hazy-rabbit-operator/internal/controller/hazyzone_controller.go::185][Secret Owned Reference]]
-
 
 *** *Idempotency* in Rabbit commands
 
@@ -130,6 +126,9 @@ Since idempotency, we can requeue the `reconcile.Result`, which will be requeud 
 
 - Bundle the operator - already lots of tooling for this.
 - Permissions - maybe make more granular.
+- Add more testing etc.
+- What would I do better - some better handling in case RabbitMQ fails midway through RabbitMQ operations.
 
+  
 
 

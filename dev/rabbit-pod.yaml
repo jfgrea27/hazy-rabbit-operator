@@ -29,6 +29,7 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/name: rabbitmq
+  type: LoadBalancer
   ports:
     - protocol: TCP
       port: 15672

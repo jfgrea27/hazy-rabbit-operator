@@ -163,7 +163,7 @@ func (r *HazyZoneReconciler) secretForHazyZone(hz *hazyv1alpha1.HazyZone) *corev
 			Namespace: hz.Namespace,
 		},
 		StringData: map[string]string{
-			"RABBIT_USER":     hz.Spec.VHost,
+			"RABBIT_USER":     hz.Spec.Username,
 			"RABBIT_PASSWORD": hz.Spec.Password,
 		},
 	}

@@ -69,8 +69,8 @@ func FillDefaultsHazyZoneSPec(hz *HazyZone, ns string) *HazyZone {
 	if len(spec.VHost) == 0 {
 		spec.VHost = ns
 	}
-	if len(spec.Username) == 0 {
-		spec.Username = ns
+	if len(spec.Exchange) == 0 {
+		spec.Exchange = ns
 	}
 
 	if len(spec.Username) == 0 {

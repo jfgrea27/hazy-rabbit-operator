@@ -2,7 +2,6 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: rabbit-sample-consumer
-  namespace: zonea
 spec:
   containers:
   - name: rabbit-sample-consumer
@@ -13,14 +12,16 @@ spec:
     - containerPort: 15672
     envFrom:  
     - secretRef:
-        name: zonea-rabbit-sec
+        name: zone-sensitive-rabbit-sec
     env:
     - name: SAMPLE_QUEUE
-      value: queue5
+      value: queue-jobs
     - name: SAMPLE_EXCHANGE
-      value: zonea
+      value: app
     - name: SAMPLE_RABBIT_HOST
       value: rabbit-svc.broker-zone.svc.cluster.local
     - name: SAMPLE_RABBIT_PORT
       value: "5672"
+    - name: SAMPLE_VHOST
+      value: zone-sensitive
 

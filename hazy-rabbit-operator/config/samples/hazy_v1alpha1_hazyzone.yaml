@@ -7,15 +7,14 @@ metadata:
     app.kubernetes.io/part-of: hazy-rabbit-operator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: hazy-rabbit-operator
-  name: hazyzone-sample
+  name: zone-sensitive
   finalizers:
   - hazy.hazy.com/rabbitcleanup
 spec:
-  vHost: zone-train
-  username: hazy-usr
-  exchange: hazy
+  vHost: zone-sensitive
+  username: usr
+  exchange: app
   queues:
-  - queue-train
-  - queue-logs
-  - queue-other
-  - new-queue
+  - queue-jobs
+  - queue-new-queue
+
